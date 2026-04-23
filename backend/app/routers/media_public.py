@@ -18,7 +18,7 @@ router = APIRouter()
 _CACHE = "public, max-age=3600"
 
 
-@router.get("/media/{file_path:path}")
+@router.get("/media/{file_path:path}", response_model=None)
 def serve_public_media(file_path: str) -> FileResponse | StreamingResponse:
     if not file_path or ".." in file_path.split("/"):
         raise HTTPException(status_code=404, detail="Not found")
