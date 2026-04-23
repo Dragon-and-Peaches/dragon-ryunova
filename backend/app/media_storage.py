@@ -139,6 +139,30 @@ def iter_s3_media_chunks(key: str) -> tuple[Iterator[bytes], str] | None:
     return chunks(), content_type
 
 
+def head_s3_media_meta(key: str) -> tuple[int, str] | None:
+    """Return (content_length, content_type) from S3 HeadObject, or None if missing or not applicable."""
+    s = get_settings()
+    if not (s.use_s3_media and key_uses_object_storage(key)):
+        return None
+    bucket = (s.aws_s3_media_bucket or "").strip()
+    if not bucket:
+        return None
+    from botocore.exceptions import ClientError
+
+    try:
+        h = _client().head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("NoSuchKey", "404", "403", "AccessDenied"):
+            return None
+        logger.warning("S3 head_object failed for %s: %s", key, e)
+        raise
+    length = int(h.get("ContentLength") or 0)
+    raw_ct = h.get("ContentType") or ""
+    content_type = raw_ct.split(";")[0].strip() or "application/octet-stream"
+    return length, content_type
+
+
 def guess_content_type_for_local(path: Path) -> str:
     guessed, _ = mimetypes.guess_type(path.name)
     return guessed or "application/octet-stream"
