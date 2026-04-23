@@ -17,6 +17,18 @@ from app.media_storage import (
 router = APIRouter()
 
 _CACHE = "public, max-age=3600"
+# Page is on SITE host; media is on API host — allow browsers to load <img src="https://api…/media/…">.
+_MEDIA_EMBED = {
+    "Cross-Origin-Resource-Policy": "cross-origin",
+    "Access-Control-Allow-Origin": "*",
+}
+
+
+def _media_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
+    h = {"Cache-Control": _CACHE, **_MEDIA_EMBED}
+    if extra:
+        h.update(extra)
+    return h
 
 
 @router.api_route("/media/{file_path:path}", methods=["GET", "HEAD"], response_model=None)
@@ -34,7 +46,7 @@ def serve_public_media(request: Request, file_path: str) -> FileResponse | Strea
                 return Response(
                     content=b"",
                     media_type=content_type,
-                    headers={"content-length": str(length), "Cache-Control": _CACHE},
+                    headers=_media_headers({"content-length": str(length)}),
                 )
         local_head = resolved_local_media_file(key)
         if local_head is not None:
@@ -42,7 +54,7 @@ def serve_public_media(request: Request, file_path: str) -> FileResponse | Strea
             return Response(
                 content=b"",
                 media_type=guess_content_type_for_local(local_head),
-                headers={"content-length": str(length), "Cache-Control": _CACHE},
+                headers=_media_headers({"content-length": str(length)}),
             )
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -53,7 +65,7 @@ def serve_public_media(request: Request, file_path: str) -> FileResponse | Strea
             return StreamingResponse(
                 body_iter,
                 media_type=content_type,
-                headers={"Cache-Control": _CACHE},
+                headers=_media_headers(),
             )
 
     local = resolved_local_media_file(key)
@@ -61,6 +73,6 @@ def serve_public_media(request: Request, file_path: str) -> FileResponse | Strea
         return FileResponse(
             local,
             media_type=guess_content_type_for_local(local),
-            headers={"Cache-Control": _CACHE},
+            headers=_media_headers(),
         )
     raise HTTPException(status_code=404, detail="Not found")
