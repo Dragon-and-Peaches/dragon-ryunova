@@ -96,6 +96,8 @@ def main() -> None:
         f'CORS_ORIGINS="{esc(cors)}"',
         f'SITE_URL="{esc(site_url)}"',
         f'API_PUBLIC_URL="{esc(api_public)}"',
+        # Matches docker-compose.api volume ./data/uploads:/app/uploads (avoid relative ./uploads ambiguity).
+        'UPLOAD_DIR="/app/uploads"',
         f'DJANGO_SECRET_KEY="{esc(django_secret)}"',
         'DEBUG="false"',
         'USE_WHITENOISE="true"',
