@@ -2,12 +2,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.constants import DEFAULT_ORGANISATION_ID
 from app.media_storage import ensure_org_media_folders
-from app.routers import admin_users, auth, brands, categories, marketplaces, organisations, products, stats
+from app.routers import admin_users, auth, brands, categories, marketplaces, media_public, organisations, products, stats
 
 settings = get_settings()
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
@@ -32,7 +31,7 @@ api.include_router(brands.router)
 api.include_router(categories.router)
 api.include_router(marketplaces.router)
 api.include_router(products.router)
-api.mount("/media", StaticFiles(directory=str(settings.upload_dir)), name="media")
+api.include_router(media_public.router)
 
 app.mount("/api/v1", api)
 

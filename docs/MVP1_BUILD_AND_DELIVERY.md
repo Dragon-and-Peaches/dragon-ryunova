@@ -8,7 +8,7 @@ Use it as a handoff: scope achieved, major actions, where things live, and what 
 
 - **Product audit** — `ryunova_product_master.updated_by_user_id`, API `created_by_label` / `updated_by_label`, Django product list + edit “Record details”, and setting `updated_by_user_id` on product update and image upload.
 - **Taxonomy parity** — Categories and brands already had audit fields and UI; products were aligned to the same pattern.
-- **Schema delivery** — All MVP1 DDL is **`db/mvp1_schema.sql`** (schema **`ryunova`**, login codes + profile columns + email-change token fields merged in). Deploy applies **`db/migrations/order.txt`** (currently **`mvp1_schema.sql`** only). Optional legacy/manual scripts **`patch_taxonomy_sort_by_name.sql`**, **`patch_public_code_10_alnum.sql`**, **`patch_multi_tenant.sql`** are not part of the deploy order (see **db/README.md**).
+- **Schema delivery** — All canonical DDL is **`db/mvp1_schema.sql`** (schema **`ryunova`**; includes comments, listing channels, etc.). **GitHub deploy does not run SQL**; new servers run **`mvp1_schema.sql`** or **`scripts/run_ryunova_migrations.sh`** manually (see **db/README.md**).
 
 ---
 
@@ -59,7 +59,7 @@ All MVP1 DDL is consolidated in **`db/mvp1_schema.sql`**. Production deploy runs
 
 **Documentation:** Full long-form schema and future tables remain in **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)**; MVP1 implements the subset above.
 
-**Repo hygiene:** No chained incremental DDL beyond **`order.txt`**; optional **`patch_*.sql`** files that remain are legacy or manual-only (taxonomy backfill, public-code notes, old public-schema upgrade). Old dev databases: drop/recreate or hand-written `ALTER` per **LOCAL_DEVELOPMENT.md**.
+**Repo hygiene:** The **`db/`** folder keeps **`mvp1_schema.sql`**, **`README.md`**, and **`migrations/order.txt`** (for **`run_ryunova_migrations.sh`**). Old dev databases: drop/recreate or hand-written `ALTER` per **LOCAL_DEVELOPMENT.md**.
 
 ---
 

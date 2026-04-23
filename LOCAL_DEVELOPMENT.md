@@ -37,8 +37,6 @@ PGPASSWORD=ryunova psql -h localhost -U ryunova -d ryunova -f db/mvp1_schema.sql
 
 **Existing database from an older layout?** This repo no longer ships incremental SQL migrations. Either **drop and recreate** the database (then run `mvp1_schema.sql` and re-seed), or write your own `ALTER`/`UPDATE` scripts by diffing against `docs/DATABASE_SCHEMA.md` and `db/mvp1_schema.sql`.
 
-**Tables under `public` named `ryunova_*`?** The API uses schema **`ryunova`** (`ryunova.ryunova_users`, …). If your tables are still in **`public`**, run **`db/move_public_tables_to_ryunova_schema.sql`** once (see **`db/README.md`** — backup first).
-
 ## 2. Backend (FastAPI)
 
 ```bash
@@ -110,7 +108,7 @@ or delete the old row from `ryunova_users` and run the seed again.
 
 | Script | Purpose |
 |--------|---------|
-| **`scripts/dev_local.sh`** | Creates **`./.venv`** at the repo root, installs `backend/` + `web/` requirements, runs **`python web/manage.py migrate`**. Does not start uvicorn/Django. Optional: `./scripts/dev_local.sh --sql` applies `db/migrations/order.txt` via local **`psql`** (set `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`). |
+| **`scripts/dev_local.sh`** | Creates **`./.venv`** at the repo root, installs `backend/` + `web/` requirements, runs **`python web/manage.py migrate`**. Does not start uvicorn/Django. Optional: `./scripts/dev_local.sh --sql` applies SQL files listed in **`db/migrations/order.txt`** (canonical: **`mvp1_schema.sql`**) via local **`psql`** (set `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`). |
 | **`scripts/dev_local_docker.sh`** | **`docker compose -p ryunova -f docker-compose.app-only.yml up -d --build`** — needs a root **`.env`** (copy from **`deploy/local.docker.env.example`**). API **:8010**, web **:8011**. For **local** parity with the production compose layout. |
 
 **Production deployment** is **only** via **GitHub Actions** (push to **`prod`** or **workflow_dispatch**) — see **`docs/DEPLOYMENT_EC2_ALB.md`**.

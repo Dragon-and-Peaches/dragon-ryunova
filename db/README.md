@@ -1,77 +1,39 @@
 # Database
 
-## Canonical DDL
+## Canonical DDL (single file)
 
-**`mvp1_schema.sql`** is the **only** required file for a new database. It creates schema **`ryunova`**, all **`ryunova.ryunova_*`** tables, indexes, enum type, and comments (including login codes, full user profile columns, email-change token fields, product dimensions, media cover flags — everything that used to live in separate `patch_*.sql` files).
+**`mvp1_schema.sql`** is the **only** file you need for a **new** PostgreSQL database. It creates schema **`ryunova`**, all **`ryunova.ryunova_*`** tables, indexes, enum type, comments, **product comments**, **listing channels** (marketplace registry + seed rows), **listing readiness**, and the **product × channel** matrix.
 
 ```bash
-psql -U ryunova -d ryunova -f db/mvp1_schema.sql
+psql -U ryunova -d ryunova -v ON_ERROR_STOP=1 -f db/mvp1_schema.sql
 ```
 
 - **Bootstrap / ops** (platform user, org membership): see **`docs/MULTI_TENANT.md`** and the commented optional section at the end of **`mvp1_schema.sql`**.
-- **Optional data-only SQL** (not in deploy order): **`patch_taxonomy_sort_by_name.sql`** — one-time sort_order backfill; run manually if needed.
-- **`patch_public_code_10_alnum.sql`** — notes only (10-char codes; optional **`backend/scripts/backfill_public_codes.py`**).
-- **`patch_multi_tenant.sql`** — **legacy** (old **public**-schema upgrades); do not use on a greenfield **`ryunova`** database.
-
-### Legacy: `ryunova_*` tables in `public` (not `ryunova`)
-
-The application expects **`ryunova.ryunova_*`** (see `backend/app/database.py`). If your database was created before the canonical **`ryunova`** schema layout, data may live as **`public.ryunova_users`**, etc., which produces errors like `relation "ryunova.ryunova_users" does not exist` even though a similarly named table exists under **`public`**.
-
-**One-time fix:** run **`db/move_public_tables_to_ryunova_schema.sql`** (do **not** add it to **`order.txt`**). It moves **`public.ryunova_*`** tables (and the product condition enum, if needed) into schema **`ryunova`**. Take a backup first.
-
-```bash
-psql -U ryunova -d ryunova -v ON_ERROR_STOP=1 -f db/move_public_tables_to_ryunova_schema.sql
-```
-
-If both **`public.ryunova_users`** and **`ryunova.ryunova_users`** exist, resolve the duplicate manually before running the script.
-
----
+- **Public code format** (10‑char `public_code`): optional **`backend/scripts/backfill_public_codes.py`** if you need to rewrite legacy values.
 
 ## Production / EC2 (GitHub Actions)
 
-Deploy (`.github/workflows/deploy-prod.yml`) runs **`scripts/run_ryunova_migrations.sh`** on the instance after `git pull`. It:
+**Deploy does not run SQL.** The workflow pulls **`/opt/apps/app_ryunova`** and starts Docker only. Schema changes are assumed to be applied already on shared PostgreSQL.
 
-1. Creates the target database **if it does not exist** (admin must be allowed to `CREATE DATABASE`, or create the DB manually).
-2. Ensures the **app role** from `PROD_POSTGRES_APPL_*` exists and sets password.
-3. Applies SQL files listed in **`db/migrations/order.txt`** in order. Paths are **relative to `db/`** (e.g. **`mvp1_schema.sql`**, **`migrations/002_product_comments.sql`**). The recorded name in **`ryunova_schema_migrations`** is the **basename** of each path; skips if already applied.
-4. Grants DML on **`ryunova.ryunova_*`** app tables (not **`ryunova.ryunova_schema_migrations`**) to the app role.
+**New environment** (empty DB or new cluster):
 
-FinText continues to use schema **`fintext`** in the same **`latrobe_apps_db`** when shared.
+1. Create the database and app role (or use **`scripts/run_ryunova_migrations.sh`**, which can create the DB, ensure the role, apply **`db/mvp1_schema.sql`** via **`db/migrations/order.txt`**, and grant DML to the app user — run **once** on a host that can reach Postgres).
+2. Or run **`psql`** against **`db/mvp1_schema.sql`** with a superuser / owner account, then grant the app role as needed (see script for grant pattern).
+
+FinText can continue to use schema **`fintext`** in the same **`latrobe_apps_db`** when shared.
 
 ### Future schema changes
 
-1. Add **`db/migrations/002_add_feature.sql`** (or similar), idempotent **`IF NOT EXISTS`** / **`ADD COLUMN IF NOT EXISTS`** where possible.
-2. Append the path **relative to `db/`** to the end of **`db/migrations/order.txt`** (e.g. **`migrations/002_add_feature.sql`**).
-3. Merge to **`prod`** and deploy.
+Extend **`mvp1_schema.sql`** (idempotent `IF NOT EXISTS` / `ADD COLUMN` where possible) **or** add a new SQL file and document it here. **Deploy will not apply it automatically** unless you reintroduce that in CI.
 
 ---
 
 ### Media path migration (one-time)
 
-If you deployed **before** the **`orgs/<organisation_id>/...`** layout, existing rows may still use legacy keys (`products/...`, `org-logos/...`, `avatars/...`, or `users/.../avatars/...`) and files on disk under the old paths.
-
-**Do not** add a blind SQL migration to **`order.txt`** that only updates keys — the browser would 404 until files exist at the new paths.
-
-**Procedure:**
-
-1. Deploy the application version that reads/writes the new paths.
-2. On the **EC2 host** (or anywhere with **`DATABASE_URL`** and the **`uploads`** volume mounted like production), run from **`backend/`**:
-
-   ```bash
-   docker exec ryunova_api python scripts/migrate_media_paths.py --dry-run
-   docker exec ryunova_api python scripts/migrate_media_paths.py
-   ```
-
-   This moves files under **`/app/uploads`** and updates **`ryunova_product_image.s3_key`**, **`ryunova_organisations.logo_s3_key`**, **`ryunova_users.avatar_s3_key`**.
-
-3. If **`USE_S3_MEDIA=true`**, copy objects in S3 to the new keys first, then run **`python scripts/migrate_media_paths.py --db-only`** so only the database is updated.
-
-Reference SQL (products/logos only) for manual use: **`db/migrations/002_media_paths_reference.sql`** (commented; not applied by deploy).
+If you deployed **before** the **`orgs/<organisation_id>/...`** layout, use **`backend/scripts/migrate_media_paths.py`** (see script comments and **`docs/DEPLOYMENT_EC2_ALB.md`**). Do **not** run blind SQL updates without moving files.
 
 ---
 
-## Local database reset (after consolidating patches)
+## Local database reset
 
-If you previously applied old **`patch_*.sql`** files to a dev DB, either **drop and recreate** the database and run **`mvp1_schema.sql`** once, or diff your DB against this repo and write your own `ALTER` scripts.
-
-For a full greenfield install, align with **`docs/DATABASE_SCHEMA.md`** as needed.
+If you have a **stale** dev DB, **drop and recreate** the database and run **`mvp1_schema.sql`** once, or diff against **`docs/DATABASE_SCHEMA.md`** and write your own `ALTER` scripts.

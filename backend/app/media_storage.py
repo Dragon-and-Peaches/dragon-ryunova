@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -83,3 +85,58 @@ def delete_key(key: str | None) -> None:
     p = Path(s.upload_dir) / key
     if p.is_file():
         p.unlink(missing_ok=True)
+
+
+def resolved_local_media_file(key: str) -> Path | None:
+    """Absolute path to key under upload_dir, or None if traversal or missing."""
+    if not key or ".." in Path(key).parts or key.startswith(("/", "\\")):
+        return None
+    s = get_settings()
+    root = Path(s.upload_dir).resolve()
+    candidate = (root / key).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def iter_s3_media_chunks(key: str) -> tuple[Iterator[bytes], str] | None:
+    """Stream object bytes from S3 when USE_S3_MEDIA and key is under orgs/. Returns (iterator, content_type) or None."""
+    s = get_settings()
+    if not (s.use_s3_media and key_uses_object_storage(key)):
+        return None
+    bucket = (s.aws_s3_media_bucket or "").strip()
+    if not bucket:
+        return None
+    from botocore.exceptions import ClientError
+
+    try:
+        obj = _client().get_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("NoSuchKey", "404"):
+            return None
+        logger.warning("S3 get_object failed for %s: %s", key, e)
+        raise
+    body = obj["Body"]
+    raw_ct = obj.get("ContentType") or ""
+    content_type = raw_ct.split(";")[0].strip() or "application/octet-stream"
+
+    def chunks() -> Iterator[bytes]:
+        try:
+            for chunk in body.iter_chunks(chunk_size=64 * 1024):
+                if chunk:
+                    yield chunk
+        finally:
+            try:
+                body.close()
+            except Exception:
+                pass
+
+    return chunks(), content_type
+
+
+def guess_content_type_for_local(path: Path) -> str:
+    guessed, _ = mimetypes.guess_type(path.name)
+    return guessed or "application/octet-stream"
