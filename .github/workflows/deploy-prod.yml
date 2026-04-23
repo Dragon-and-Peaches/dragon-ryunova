@@ -18,7 +18,7 @@
 #   AWS_REGION or PROD_AWS_REGION — S3 URL region (default ap-southeast-2)
 #   PROD_MEDIA_PUBLIC_BASE_URL — override S3 virtual-host URL (e.g. CloudFront)
 #   PROD_DB_HOST, PROD_DB_PORT, PROD_POSTGRES_DB_NAME, PROD_EMAIL_* (or EMAIL_* fallbacks — same values as FinText), ECR + AWS keys (see docs/DEPLOYMENT_EC2_ALB.md).
-#   Optional PROD_USE_S3_MEDIA=true — store orgs/ + users/ media in S3 (IAM role on EC2 required).
+#   S3: deploy forces USE_S3_MEDIA=false in generated .env and docker-compose overrides the api container; enable S3 later in compose + USE_S3_MEDIA_VAL when IAM is ready.
 #   DEPLOY_NOTIFY_WEBHOOK_URL — optional; on success, POST JSON {"text":"..."} (Slack-compatible) when deploy finishes OK.
 # ECR: one repository (default prod/ryunova-channels); images are tagged api-<sha> and web-<sha>. Optional PROD_ECR_REPOSITORY overrides the repo name.
 # DB: PostgreSQL schema is **not** applied by this workflow (existing prod DBs are already migrated).
@@ -215,7 +215,8 @@ jobs:
           AWS_S3_MEDIA_BUCKET_VAL: ${{ secrets.PROD_AWS_S3_MEDIA_BUCKET }}
           AWS_S3_REGION_VAL: ${{ secrets.AWS_REGION || secrets.PROD_AWS_REGION || 'ap-southeast-2' }}
           MEDIA_PUBLIC_BASE_URL_VAL: ${{ secrets.PROD_MEDIA_PUBLIC_BASE_URL }}
-          USE_S3_MEDIA_VAL: ${{ secrets.PROD_USE_S3_MEDIA || 'false' }}
+          # Disk-only (data/uploads). To use S3 later: set secrets.PROD_USE_S3_MEDIA=true, pass it here, and drop the compose override on api.
+          USE_S3_MEDIA_VAL: "false"
         run: |
           python3 scripts/deploy_generate_ec2_env.py > /tmp/ryunova.env
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no /tmp/ryunova.env \

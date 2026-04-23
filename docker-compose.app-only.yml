@@ -12,6 +12,9 @@ services:
     image: ${RYUNOVA_API_IMAGE:-ryunova-api:local}
     env_file:
       - .env
+    # Overrides .env: keep media on ./data/uploads until S3 + IAM are enabled (then set true or remove).
+    environment:
+      USE_S3_MEDIA: "false"
     ports:
       - "${RYUNOVA_API_PORT:-8010}:8010"
     volumes:
