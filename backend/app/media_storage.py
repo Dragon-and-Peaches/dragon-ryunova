@@ -115,7 +115,9 @@ def iter_s3_media_chunks(key: str) -> tuple[Iterator[bytes], str] | None:
         obj = _client().get_object(Bucket=bucket, Key=key)
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "")
-        if code in ("NoSuchKey", "404"):
+        # Missing object, or bucket/policy denies anonymous-style errors on this code path — fall back to local.
+        if code in ("NoSuchKey", "404", "403", "AccessDenied"):
+            logger.warning("S3 get_object not usable for %s (%s); trying local if present", key, code)
             return None
         logger.warning("S3 get_object failed for %s: %s", key, e)
         raise

@@ -130,11 +130,11 @@ The seeded **default organisation** (`slug` **`default`**, id **`00000000-0000-4
 
 **Avatar storage:** the browser sends **`X-Organisation-Id`** (Django passes the session workspace org). The API stores the file under that org’s tree; if missing or invalid, it uses the user’s first membership (by org name), then the **default organisation** id above.
 
-**S3 (`USE_S3_MEDIA=true`):** Set GitHub secret **`PROD_USE_S3_MEDIA`** to **`true`**. Deploy sets **`USE_S3_MEDIA=true`**, **`MEDIA_PUBLIC_BASE_URL`** to the bucket virtual-host URL (unless **`PROD_MEDIA_PUBLIC_BASE_URL`** overrides). IAM + bucket **`GetObject`** as before.
+**S3 (`USE_S3_MEDIA=true`):** Set GitHub secret **`PROD_USE_S3_MEDIA`** to **`true`**. Deploy sets **`USE_S3_MEDIA=true`**. JSON and HTML still use **`API_PUBLIC_URL` + `/api/v1/media/...`**; the API streams objects from S3 using the instance IAM role (private buckets are fine). Optional **`PROD_MEDIA_PUBLIC_BASE_URL`** is stored as **`MEDIA_PUBLIC_BASE_URL`** for reference only.
 
 **Legacy DB keys** (`products/...`, top-level `users/...`, `org-logos/...`) still resolve via **`/api/v1/media/...`** until re-uploaded or migrated once with **`backend/scripts/migrate_media_paths.py`** (see **`db/README.md`** — not part of deploy).
 
-**ALB:** For disk mode, **`api.*` → 8010** (§2). For S3 mode, **`orgs/`** URLs use **`MEDIA_PUBLIC_BASE_URL`**.
+**ALB:** Route the API hostname to **8010** (§2) for **`/api/v1/media/...`** in all modes (disk or S3).
 
 ---
 

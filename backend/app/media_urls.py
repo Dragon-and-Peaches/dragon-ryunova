@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 from app.config import get_settings
-from app.media_storage import key_uses_object_storage
 
 
 def public_media_url(s3_key: str | None) -> str | None:
     if not s3_key:
         return None
     s = get_settings()
-    override = (s.media_public_base_url or "").strip()
-    # orgs/... keys with USE_S3_MEDIA use the public bucket/CloudFront base; legacy paths stay on the API.
-    if override and s.use_s3_media and key_uses_object_storage(s3_key):
-        return f"{override.rstrip('/')}/{s3_key}"
+    # Always use the API host + `/api/v1/media/...`. The handler streams from S3 with IAM
+    # (USE_S3_MEDIA) or reads local disk. Sending browsers straight to MEDIA_PUBLIC_BASE_URL
+    # (virtual-hosted S3) requires public object ACLs; a private bucket returns 403 and broken images.
     base = str(s.api_public_url).rstrip("/")
     prefix = s.media_url_prefix.rstrip("/")
     return f"{base}{prefix}/{s3_key}"

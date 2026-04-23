@@ -11,8 +11,8 @@ wildcard certs match: ryunova-api.<parent> when PROD_SITE_DOMAIN has 3+ labels (
 ryunova.latrobecomputing.co.in -> ryunova-api.latrobecomputing.co.in), else api.<PROD_SITE_DOMAIN>.
 
 S3: set USE_S3_MEDIA_VAL=true and attach an IAM role with s3:PutObject/DeleteObject/GetObject on the bucket.
-When USE_S3_MEDIA is true, MEDIA_PUBLIC_BASE_URL defaults to the bucket virtual-host URL unless PROD_MEDIA_PUBLIC_BASE_URL
-is set (e.g. CloudFront). When false, MEDIA_PUBLIC_BASE_URL is empty and new orgs/ + users/ keys are stored on API disk.
+Browser media URLs always use API_PUBLIC_URL + /api/v1/media (FastAPI streams from S3 with IAM). MEDIA_PUBLIC_BASE_URL
+is optional metadata only (e.g. PROD_MEDIA_PUBLIC_BASE_URL); leave unset unless you need it recorded in .env.
 
 SMTP: defaults to smtp.hostinger.com:587 + TLS. Set EMAIL_HOST_VAL / EMAIL_PORT_VAL / EMAIL_USE_TLS_VAL from
 GitHub Actions env (see deploy-prod.yml). FastAPI and Django both read EMAIL_* from the same .env.
@@ -70,12 +70,7 @@ def main() -> None:
     aws_region = (os.environ.get("AWS_S3_REGION_VAL") or "").strip() or DEFAULT_AWS_REGION
     use_s3_media = (os.environ.get("USE_S3_MEDIA_VAL") or "").strip().lower() in ("1", "true", "yes")
     media_public_override = (os.environ.get("MEDIA_PUBLIC_BASE_URL_VAL") or "").strip()
-    if media_public_override:
-        media_public_base = media_public_override.rstrip("/")
-    elif use_s3_media:
-        media_public_base = f"https://{s3_bucket}.s3.{aws_region}.amazonaws.com"
-    else:
-        media_public_base = ""
+    media_public_base = media_public_override.rstrip("/") if media_public_override else ""
 
     host_only = site_domain.split(":")[0]
     site_url = f"https://{host_only}"

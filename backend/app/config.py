@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     media_url_prefix: str = "/api/v1/media"
     # JSON absolute URLs for API host; set API_PUBLIC_URL in production .env
     api_public_url: str = Field(default="http://127.0.0.1:8000", alias="API_PUBLIC_URL")
-    # When set, public_media_url() uses this base (S3/CloudFront) instead of api_public_url + /api/v1/media
+    # Optional reference / future CDN base; public_media_url() always uses API_PUBLIC_URL + /api/v1/media
+    # so private S3 buckets work (API streams with IAM). Do not rely on this for browser img src today.
     media_public_base_url: str = Field(default="", alias="MEDIA_PUBLIC_BASE_URL")
     # Production bucket arn:aws:s3:::ryunova-channels-organisations-media — used when wiring boto3 uploads
     aws_s3_media_bucket: str = Field(default="", alias="AWS_S3_MEDIA_BUCKET")
