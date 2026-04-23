@@ -6,9 +6,10 @@ Django calls FastAPI on the Docker network: RYUNOVA_API_BASE=http://api:8010/api
 
 Public URLs in API JSON use API_PUBLIC_URL / RYUNOVA_API_PUBLIC (typically https://api host).
 
-Optional PROD_API_PUBLIC_HOST: if unset, defaults to a single-level API hostname so typical
-wildcard certs match: ryunova-api.<parent> when PROD_SITE_DOMAIN has 3+ labels (e.g.
-ryunova.latrobecomputing.co.in -> ryunova-api.latrobecomputing.co.in), else api.<PROD_SITE_DOMAIN>.
+Default API host when PROD_SITE_DOMAIN has 3+ labels: ryunova-api.<parent> (e.g.
+ryunova.latrobecomputing.co.in -> ryunova-api.latrobecomputing.co.in). Route 53 should use that
+flat name (A alias to ALB) unless you override with PROD_API_PUBLIC_HOST / API_HOST_VAL (hostname only,
+no https://) to match a different record (e.g. nested API hostname + matching ACM SAN).
 
 S3: set USE_S3_MEDIA_VAL=true and attach an IAM role with s3:PutObject/DeleteObject/GetObject on the bucket.
 Browser media URLs always use API_PUBLIC_URL + /api/v1/media (FastAPI streams from S3 with IAM). MEDIA_PUBLIC_BASE_URL

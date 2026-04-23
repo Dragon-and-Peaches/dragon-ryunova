@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 from app.config import get_settings
 from app.constants import DEFAULT_ORGANISATION_ID
@@ -36,6 +37,8 @@ api.include_router(media_public.router)
 app.mount("/api/v1", api)
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
+@app.api_route("/health", methods=["GET", "HEAD"], response_model=None)
+def health(request: Request) -> dict[str, str] | Response:
+    if request.method == "HEAD":
+        return Response(status_code=200)
     return {"status": "ok"}

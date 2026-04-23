@@ -28,10 +28,10 @@ Single source of truth for **deploying RyuNova to AWS**: EC2, Application Load B
 1. **Browser UI (Django):** Listener rule for your **site hostname** (e.g. `ryunova.example.com`) → target group → EC2 instance port **8011**.  
    - FastAPI has **no route for `GET /`**; if the UI hostname points at **8010**, browsers see JSON `{"detail":"Not Found"}`. **8011** serves `/` and `/accounts/login/`.
 
-2. **Public API + media (required for images):** The browser loads avatars and product photos from **`https://<your-api-public-host>/api/v1/media/...`** (see **`API_PUBLIC_URL`** / **`RYUNOVA_API_PUBLIC`** in `.env`). You **must** route the **API hostname** to port **8010** (FastAPI), not **8011** (Django).  
-   - **Route 53:** Create **`A`/`AAAA` alias** (or `CNAME`) for that API hostname (e.g. **`ryunova-api.latrobecomputing.co.in`**) → same ALB as the app host.  
-   - **ALB listener rule:** **Host header** = that API hostname → target group → EC2 → port **8010**.  
-   If **API traffic hits 8011** (Django), `/api/v1/media/...` is not served by Django and **images break** (404 or wrong app).
+2. **Public API + media (required for images):** The browser loads avatars and product photos from **`https://<your-api-public-host>/api/v1/media/...`** (see **`API_PUBLIC_URL`** / **`RYUNOVA_API_PUBLIC`** in `.env`). **Standard Latrobe-style layout:** **`PROD_SITE_DOMAIN=ryunova.latrobecomputing.co.in`** → deploy defaults **`API_PUBLIC_URL=https://ryunova-api.latrobecomputing.co.in`** — create a Route 53 **A alias** for **`ryunova-api.latrobecomputing.co.in`** to the **same ALB** as the app, plus an ALB **listener rule** (Host = that name → port **8010**). The **DNS name must match `API_PUBLIC_URL` exactly** (no typos, no extra `ryunova.` segment unless you set **`PROD_API_PUBLIC_HOST`** to that nested name on purpose). You **must** route the API hostname to **8010** (FastAPI), not **8011** (Django).  
+   - **Route 53:** **`A`/`AAAA` alias** for **`ryunova-api.latrobecomputing.co.in`** → ALB (same as **`ryunova.latrobecomputing.co.in`**).  
+   - **ALB listener rule:** **Host header** = **`ryunova-api.latrobecomputing.co.in`** → target group → EC2 → port **8010**.  
+   If **API traffic hits 8011** (Django), `/api/v1/media/...` is not served and **images break** (404 or wrong app).
 
 3. **Security groups:** ALB → EC2 allow **8010** and **8011** from the ALB security group as needed. **PostgreSQL** is not exposed to the internet. Containers reach Postgres via **`host.docker.internal:5432`** (see generated `.env`).
 
@@ -158,7 +158,7 @@ docker compose -p ryunova -f docker-compose.app-only.yml logs -f --tail=100 api
 docker compose -p ryunova -f docker-compose.app-only.yml logs -f --tail=100 web
 ```
 
-Verify API from host: **`curl -sS http://127.0.0.1:8010/health`**.  
+Verify API from host: **`curl -sS http://127.0.0.1:8010/health`** (use **`GET`**; **`curl -I`** sends **HEAD**—supported on **`/health`** after the current API build).  
 Verify web → API inside Compose: **`docker exec ryunova_web python -c "import urllib.request; print(urllib.request.urlopen('http://api:8010/health').read())"`**
 
 ---
@@ -168,7 +168,7 @@ Verify web → API inside Compose: **`docker exec ryunova_web python -c "import 
 | Symptom | What to check |
 |---------|----------------|
 | **502** from ALB | Target group ports **8010/8011**, security groups, **`docker compose ps`**, container logs |
-| **Broken images** (profile, product thumbnails) | **`API_PUBLIC_URL`** host DNS → ALB; **listener rule** **Host** = that hostname → target **8010** (not 8011). On EC2: **`curl -sI http://127.0.0.1:8010/health`**. In browser: **Network** tab on image URL — expect **200** from **`/api/v1/media/...`**. |
+| **Broken images** (profile, product thumbnails) | **`API_PUBLIC_URL`** (default **`https://ryunova-api.latrobecomputing.co.in`** when **`PROD_SITE_DOMAIN=ryunova.latrobecomputing.co.in`**) must **resolve in Route 53** to the ALB. **`curl: (6) Could not resolve host`** → missing/wrong A record or name mismatch; fix DNS or set **`PROD_API_PUBLIC_HOST`** (no `https://`) to match your record, redeploy **`.env`**. **Listener rule** **Host** = that API hostname → **8010** (not 8011). On the instance: **`curl -sS http://127.0.0.1:8010/health`**. |
 | **JSON `Not Found` on `/`** | Traffic hitting **8010** (API) instead of **8011** (Django) |
 | **`DisallowedHost`** | Wrong app (e.g. FinText) or **`ALLOWED_HOSTS`** / **`PROD_SITE_DOMAIN`** |
 | **500 on `/accounts/login/`** | **`docker exec ryunova_web python manage.py migrate --noinput`**; **`docker logs ryunova_web`** |
